@@ -1,0 +1,49 @@
+# Backtest Environment Configuration - Loop_7 (LightTCN_Residual)
+# Modify this file to run different experiments
+
+[model]
+# Path to model checkpoint
+path = "final_models/models/Loop_7_state_dict.pt"
+# Model class name (must be importable)
+model_class = "LightTCN_Residual"
+# Number of features and timesteps
+num_features = 5
+num_timesteps = 20
+
+[data]
+# H5 data path for price/volume data
+h5_path = "/workspace/qlib_research/qlib_data/h5_data/daily_pv_all.h5"
+# Qlib provider URI
+provider_uri = "/workspace/qlib_research/qlib_data/us_data"
+# Region for qlib
+region = "us"
+
+[backtest]
+# Initial capital
+initial_capital = 100_000_000
+# Number of stocks to hold
+topk = 10
+# Number of stocks to replace each day
+n_drop = 1
+# Trading costs
+open_cost = 0.0005
+close_cost = 0.0015
+# Minimum cost threshold
+min_cost = 5.0
+# Risk degree (investment ratio)
+risk_degree = 0.95
+
+[inference]
+# Features to use
+features = ["OPEN", "HIGH", "LOW", "RET", "VOL"]
+# Normalization stats end date
+train_end_date = "2022-12-31"
+
+[period]
+# Test period (overridden by --from/--to CLI args)
+start = "2025-01-01"
+end = "2025-12-31"
+
+[benchmark]
+# Benchmark instrument (e.g., "SPY" or "SH000300")
+instrument = "SPY"

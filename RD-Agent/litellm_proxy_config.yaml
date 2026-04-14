@@ -1,0 +1,48 @@
+model_list:
+  # Primary: Z.ai GLM-4.7
+  - model_name: glm-4.7
+    litellm_params:
+      model: openai/glm-4.7
+      api_key: ${LITELLM_OPENAI_API_KEY}
+      api_base: ${LITELLM_OPENAI_API_BASE}
+      timeout: 120
+      max_retries: 2
+
+  # Backup 1: OpenAI GPT-4o (fallback)
+  - model_name: glm-4.7-backup
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: ${LITELLM_BACKUP_API_KEY_1}
+      api_base: ${LITELLM_BACKUP_API_BASE_1}
+      timeout: 120
+      max_retries: 2
+
+  # Backup 2: Anthropic Claude (fallback)
+  - model_name: glm-4.7-backup-2
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: ${LITELLM_BACKUP_API_KEY_2}
+      api_base: ${LITELLM_BACKUP_API_BASE_2}
+      timeout: 120
+      max_retries: 2
+
+router_settings:
+  # Retry settings
+  num_retries: 3
+  retry_after: 10
+  timeout: 120
+
+  # Fallback strategy: try next model on failure
+  fallback_config:
+    - model_name: glm-4.7
+      fallback_model_name: glm-4.7-backup
+    - model_name: glm-4.7-backup
+      fallback_model_name: glm-4.7-backup-2
+
+  # Rate limiting
+  rpm: 1000
+
+litellm_settings:
+  # Suppress detailed logging
+  drop_params: true
+  set_verbose: false

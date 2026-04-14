@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.env
+.venv
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+.cursor/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# Caches
+.cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*cache*/
+
+# DB / binary files
+*.db
+*.pkl
+*.h5
+*.pth
+*.bin
+
+# Logs
+log/
+
+# Model checkpoints & data
+qlib_research/models/
+qlib_research/models_tuned/
+qlib_research/qlib_data/
+
+# RD-Agent generated files
+RD-Agent/pickle_cache/
+RD-Agent/qlib_backup/qlib_data/
+RD-Agent/qlib_backup/pickle_cache/
+RD-Agent/qlib_backup/git_ignore_folder/
+RD-Agent/qlib_backup/log/
+RD-Agent/git_ignore_folder/
+RD-Agent/prompt_cache.db
+RD-Agent/mlruns/
+RD-Agent/reports/
+RD-Agent/factor_template/mlruns/
+
+# Shell output
+*.out

@@ -1,0 +1,12 @@
+FROM ghcr.io/berriai/litellm:main
+
+WORKDIR /app
+
+COPY litellm_proxy_config.yaml /app/config.yaml
+
+ENV PORT=4000
+ENV DATABASE_URL="sqlite:///./litellm_proxy.db"
+
+EXPOSE 4000
+
+CMD ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]

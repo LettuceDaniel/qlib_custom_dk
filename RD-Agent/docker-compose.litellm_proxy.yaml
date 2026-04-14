@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  litellm-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.litellm_proxy
+    ports:
+      - "${LITELLM_PROXY_PORT:-4000}:4000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - LITELLM_OPENAI_API_KEY=${LITELLM_OPENAI_API_KEY}
+      - LITELLM_OPENAI_API_BASE=${LITELLM_OPENAI_API_BASE}
+      - LITELLM_BACKUP_API_KEY_1=${LITELLM_BACKUP_API_KEY_1}
+      - LITELLM_BACKUP_API_BASE_1=${LITELLM_BACKUP_API_BASE_1}
+      - LITELLM_BACKUP_API_KEY_2=${LITELLM_BACKUP_API_KEY_2}
+      - LITELLM_BACKUP_API_BASE_2=${LITELLM_BACKUP_API_BASE_2}
+    volumes:
+      - ./litellm_proxy_config.yaml:/app/config.yaml
+      - litellm_proxy_data:/app
+    restart: unless-stopped
+
+volumes:
+  litellm_proxy_data:

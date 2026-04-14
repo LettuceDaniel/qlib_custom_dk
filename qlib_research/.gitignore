@@ -1,0 +1,28 @@
+# Model checkpoints & outputs
+models/
+
+# Tuned model checkpoints
+models_tuned/
+
+# Qlib market data (large binary files)
+qlib_data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.venv/

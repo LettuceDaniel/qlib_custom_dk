@@ -1,0 +1,292 @@
+# ────────────────────────────────────────────────────────────
+# 1. EXPERIMENT TRACE TEMPLATES
+# ────────────────────────────────────────────────────────────
+
+hypothesis_and_feedback: |-
+  ### Experimental History (Trials 1–{{ trace.hist|length }})
+  {% for experiment, feedback in trace.hist %}
+  #### Trial {{ loop.index }}
+  - **Hypothesis**: {{ experiment.hypothesis }}
+  - **Tasks**: {% for task in experiment.sub_tasks %}{% if task is not none and task.get_task_brief_information is defined %}{{ task.get_task_brief_information() }} {% endif %}{% endfor %}
+  - **Result**:
+    {% if experiment.result is not none %}
+    IC={{ experiment.result.loc["IC"]|round(4) }}, AnnRet={{ experiment.result.loc["1day.excess_return_without_cost.annualized_return"]|round(4) }}, MaxDD={{ experiment.result.loc["1day.excess_return_without_cost.max_drawdown"]|round(4) }}
+    {% else %}
+    Execution Failed
+    {% endif %}
+  - **Observation**: {{ feedback.observations }}
+  - **Hypothesis Evaluation**: {{ feedback.hypothesis_evaluation }}
+  - **Decision (SOTA?)**: {{ feedback.decision }}
+  ---
+  {% endfor %}
+
+last_hypothesis_and_feedback: |-
+  ## Last Trial
+  **Hypothesis**: {{ experiment.hypothesis }}
+  **Tasks**: {% for task in experiment.sub_tasks %}{% if task is not none and task.get_task_brief_information is defined %}{{ task.get_task_brief_information() }} {% endif %}{% endfor %}
+  **Result**:
+  {% if experiment.result is not none %}
+  {{ experiment.result.loc[["IC", "1day.excess_return_without_cost.annualized_return", "1day.excess_return_without_cost.max_drawdown"]] }}
+  {% endif %}
+  **Training Log** (analyze for hyperparameter issues; if found, describe corrections in next hypothesis):
+  {{ experiment.stdout }}
+  **Observation**: {{ feedback.observations }}
+  **Evaluation**: {{ feedback.hypothesis_evaluation }}
+  **Decision (SOTA?)**: {{ feedback.decision }}
+  **Suggested New Hypothesis** (reference only—accept, reject, or adapt):
+  {{ feedback.new_hypothesis }}
+  **Reasoning**: {{ feedback.reason }}
+
+sota_hypothesis_and_feedback: |-
+  ## Current SOTA
+  **Hypothesis**: {{ experiment.hypothesis }}
+  **Tasks**: {% for task in experiment.sub_tasks %}{% if task is not none and task.get_task_brief_information is defined %}{{ task.get_task_brief_information() }} {% endif %}{% endfor %}
+  **Result**:
+  {% if experiment.result is not none %}
+  {{ experiment.result.loc[["IC", "1day.excess_return_without_cost.annualized_return", "1day.excess_return_without_cost.max_drawdown"]] }}
+  {% endif %}
+  **Training Log**: {{ experiment.stdout }}
+  **Observation**: {{ feedback.observations }}
+  **Evaluation**: {{ feedback.hypothesis_evaluation }}
+  **Decision (SOTA?)**: {{ feedback.decision }}
+
+
+# ────────────────────────────────────────────────────────────
+# 2. HYPOTHESIS GENERATION — OUTPUT FORMATS
+# ────────────────────────────────────────────────────────────
+
+hypothesis_output_format: |-
+  Return JSON:
+  {
+    "hypothesis": "Exact, testable statement specifying the approach and expected improvement. 2–3 sentences.",
+    "reason": "Evidence-grounded justification (trace history, domain knowledge). Max 2 sentences."
+  }
+
+hypothesis_output_format_with_action: |-
+  Return JSON:
+  {
+    "action": "factor or model — follow hypothesis_specification if given, otherwise choose based on prior results.",
+    "hypothesis": "The proposed hypothesis. 2–3 sentences.",
+    "reason": "Justification covering the rationale for both the action choice and the hypothesis. Max 2 sentences."
+  }
+
+factor_hypothesis_output_format: |-
+  Return JSON:
+  {
+    "hypothesis": "New hypothesis based on provided context. 2–3 sentences. May propose multiple factors in one hypothesis.",
+    "reason": "Comprehensive, logical justification. Max 2 sentences."
+  }
+
+
+# ────────────────────────────────────────────────────────────
+# 3. HYPOTHESIS SPECIFICATION — FACTOR
+# ────────────────────────────────────────────────────────────
+
+factor_hypothesis_specification: |-
+  **Rules for factor hypothesis generation:**
+  1. Generate 1–5 factors per round. Start simple, increase complexity gradually.
+  2. Use the full breadth of available financial data—not just one field.
+  3. Combine factors only after simpler ones are validated.
+  4. If multiple consecutive iterations fail to beat SOTA, switch direction and restart with simple factors.
+  5. Factors that previously beat SOTA are already in the library—do NOT re-implement them.
+  6. Regardless of how many factors you plan, return ONE unified hypothesis and reason.
+
+
+# ────────────────────────────────────────────────────────────
+# 4. HYPOTHESIS SPECIFICATION — MODEL
+# ────────────────────────────────────────────────────────────
+
+model_hypothesis_specification: |-
+  **Objective**: Design a high-alpha PyTorch time-series model.
+
+  **Data Profile**: ~1.56M samples (daily rows), 5 features (OCHLV derived, pre-normalized via RobustZScoreNorm), TSDatasetH with 20-day look-back window. Do not add input-level normalization (e.g., BatchNorm on raw input) that conflicts with pre-processing.
+
+  **Design Rules**:
+  1. If no prior experiment exists, start with a simple, small architecture.
+  2. Analyze `hypothesis_and_feedback` for architectural flaws (overfitting, vanishing gradients, lack of novelty).
+  3. Prioritize insights from `sota_hypothesis_and_feedback` and `last_hypothesis_and_feedback`; optimize from either or propose new ideas.
+  4. If ≥3 consecutive attempts fail to beat SOTA (IC), or IC improvement <0.002 for 3 rounds, explore entirely new directions (e.g., switch family from RNN→SSM, or return to minimal baseline).
+  5. Focus on architecture. DO NOT modify: feature config, optimizer, or data pipeline. Auxiliary losses allowed only when tied to architectural innovation.
+  6. Every architecture MUST include regularization (dropout, layer norm, etc.) for low-SNR financial data.
+  7. Hyperparameter tuning is valid when training performance is poor.
+  8. Total trainable parameters ≤500K initially. Scale up only with evidence of underfitting.
+  **Preferred Backbones**: BiGRU, LSTM, ALSTM, cross-temporal attention, Mamba/S4, and hybrids (CNN-RNN, Attention-RNN, CNN-Mamba). No GNN.
+  **Excluded**: Vanilla Transformer, TabNet, plain MLP, GNN — lack inductive bias for short financial time-series or require unavailable cross-stock data.
+  **Innovation Directions** (after ≥5 standard trials):
+  a. Multi-scale temporal aggregation (parallel branches with different kernel/window sizes)
+  b. Attention-augmented RNN (ALSTM, GRU + cross-temporal attention)
+  c. Adaptive gating (input-dependent weighting of time steps or features)
+  d. Learnable positional encoding for financial time-series
+  e. Cross-attention between feature groups (price vs. volume)
+  f. Auxiliary multitask objectives (e.g., volatility prediction, direction classification as secondary head)
+  g. State-Space Models (Mamba-based, selective state-space with linear complexity)
+  Each must document what specific limitation of the previous SOTA it addresses.
+
+# ────────────────────────────────────────────────────────────
+# 5. EXPERIMENT OUTPUT FORMATS
+# ────────────────────────────────────────────────────────────
+
+factor_experiment_output_format: |-
+  Return JSON (1–5 factors, NO trailing commas or ellipsis):
+  {
+    "factor_name_1": {
+      "description": "[Factor Type] description of factor",
+      "formulation": "LaTeX formula",
+      "variables": {
+        "var_1": "description",
+        "var_2": "description"
+      }
+    },
+    "factor_name_2": {
+      "description": "[Factor Type] description of factor",
+      "formulation": "LaTeX formula",
+      "variables": {
+        "var_1": "description"
+      }
+    }
+  }
+
+model_experiment_output_format: |-
+  Return exactly ONE model in JSON. `hyperparameters` and `training_hyperparameters` MUST be JSON-encoded strings (use json.dumps format), NOT nested objects.
+  {
+    "model_name": {
+      "description": "Short summary of the model",
+      "formulation": "LaTeX formula of the model",
+      "architecture": "Layer-by-layer architecture description",
+      "variables": {
+        "\\hat{y}_u": "Predicted output for node u",
+        "var_2": "Description"
+      },
+      "hyperparameters": "{\"hidden_dim\": 128, \"num_heads\": 4}",
+      "training_hyperparameters": "{\"n_epochs\": 100, \"lr\": 1e-3, \"early_stop\": 8, \"batch_size\": 512, \"weight_decay\": 1e-5, \"gradient_clip_norm\": 1.0}",
+      "model_type": "TimeSeries or Tabular"
+    }
+  }
+  Note: training_hyperparameters values above are defaults—adjust based on previous training logs.
+
+
+# ────────────────────────────────────────────────────────────
+# 6. FEEDBACK GENERATION — FACTOR
+# ────────────────────────────────────────────────────────────
+
+factor_feedback_generation:
+  system: |-
+    You are a professional financial result analysis assistant in data-driven R&D.
+
+    **Scenario**: {{ scenario }}
+
+    **Pipeline Logic**:
+    - All factors that previously beat SOTA are accumulated in a library and reused every run.
+    - New factors are combined with the SOTA library, backtested, and compared against current SOTA.
+    - Goal: continuously accumulate alpha-generating factors.
+
+    **Development Directions**:
+    a) *New Direction*: Propose an unexplored factor type.
+    b) *Optimize Existing*: Improve a promising factor or propose complementary ones. Do NOT re-implement factors already in the SOTA library.
+
+    **Judgment Criteria**:
+    - Any improvement in annualized return → recommend as new SOTA (set decision to true).
+    - Minor variations in other metrics are acceptable if annualized return improves.
+    - If results are significantly worse than SOTA, suggest exploring a new factor direction entirely.
+
+    Return JSON:
+    {
+      "Observations": "Overall observations",
+      "Feedback for Hypothesis": "Whether results support or refute the hypothesis",
+      "New Hypothesis": "Proposed next hypothesis",
+      "Reasoning": "Justification for the new hypothesis",
+      "Decision": true or false
+    }
+
+  user: |-
+    **Hypothesis**: {{ hypothesis_text }}
+
+    **Tasks and Factors**:
+    {% for task in task_details %}
+    - {{ task.factor_name }}: {{ task.factor_description }}
+      - Formulation: {{ task.factor_formulation }}
+      - Variables: {{ task.variables }}
+      - Implemented: {{ task.factor_implementation }}
+      {% if task.factor_implementation == "False" %}
+      ⚠ Not implemented this round—hypothesis for this factor is unverifiable.
+      {% endif %}
+    {% endfor %}
+
+    **Combined Result**: {{ combined_result }}
+
+    Analyze: (1) Does the result support or refute the hypothesis? (2) Improvement or deterioration vs SOTA? Only implemented factors (Implementation=True) are testable.
+
+
+# ────────────────────────────────────────────────────────────
+# 7. FEEDBACK GENERATION — MODEL
+# ────────────────────────────────────────────────────────────
+
+model_feedback_generation:
+  system: |-
+    You are a quantitative analysis assistant at a top-tier hedge fund.
+
+    **Scenario**: {{ scenario }}
+
+    You will receive a model hypothesis, task description, training log, and backtest result. Provide feedback on whether results support the hypothesis, compare with SOTA, diagnose training issues, and suggest next steps.
+
+    **Judgment Criteria**:
+    - Improvement in annualized return → recommend replacing SOTA (Decision: true).
+    - Minor variations in other metrics acceptable if annualized return improves.
+    - BUT reject if IC < 0.01 (indistinguishable from noise)
+    - Also reject if MaxDD worsens by more than 50% relative to current SOTA
+    - If results are significantly worse than SOTA, suggest a new architectural direction.
+
+    Return JSON:
+    {
+      "Observations": "Analyze training logs for parameter issues, then summarize current vs SOTA results with exact scores. Max 3 sentences.",
+      "Feedback for Hypothesis": "Confirm or refute hypothesis with specific data points. Max 2 sentences.",
+      "New Hypothesis": "Revised hypothesis considering observed patterns. Max 2 sentences.",
+      "Reasoning": "Rationale using specific trends or performance shifts. Max 2 sentences.",
+      "Decision": true or false
+    }
+
+  user: |-
+    {% if sota_hypothesis %}
+    # SOTA Reference
+    Hypothesis: {{ sota_hypothesis.hypothesis }}
+    Task: {{ sota_task }}
+    Code: {{ sota_code }}
+    Result: {{ sota_result }}
+    {% else %}
+    # First round — no prior SOTA. Treat as successful if IC > 0. Do not set the bar too high.
+    {% endif %}
+
+    # Current Round
+    Hypothesis: {{ hypothesis.hypothesis }}
+    Reason: {{ hypothesis.reason }}
+    Task: {{ exp.sub_tasks[0].get_task_information() }}
+    Code: {{ exp.sub_workspace_list[0].file_dict.get("model.py") }}
+    Training Log: {{ exp.stdout }}
+    Result: {{ exp_result }}
+
+
+# ────────────────────────────────────────────────────────────
+# 8. ACTION SELECTION (factor vs model)
+# ────────────────────────────────────────────────────────────
+
+action_gen:
+  system: |-
+    Quantitative investment relies on two pillars: **factors** (alpha signals) and **models** (prediction architectures). You are a senior quant researcher. Given the experiment history, decide whether the next iteration should focus on factors or models.
+
+    Return JSON:
+    {
+      "action": "factor" or "model"
+    }
+
+  user: |-
+    {% if trace.hist|length == 0 %}
+    This is the first round. No prior experiments exist.
+    {% else %}
+    **Experiment History**:
+    {{ hypothesis_and_feedback }}
+    {% endif %}
+
+    {% if last_hypothesis_and_feedback != "" %}
+    **Last Trial** (includes a suggested new hypothesis—evaluate whether to adopt, adapt, or reject it; cross-domain transfer between factor↔model is encouraged):
+    {{ last_hypothesis_and_feedback }}
+    {% endif %}
